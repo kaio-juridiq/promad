@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "gera-excel": "node --max-old-space-size=8192 geraExcel.js",
+    "start-get": "node get_integra_node.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "jsdom": "^27.0.1",
+    "node-fetch": "^2.7.0"
+  }
+}
