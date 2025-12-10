@@ -5,17 +5,23 @@ const qs = require("querystring");
 const { JSDOM } = require("jsdom");
 
 const hjSession ="eyJpZCI6ImQ3MDExZWZjLWU3MmMtNGRkNi05NzQ3LTVmNmU4NGZjOWM1YiIsImMiOjE3NjUzNTQxMzYwMjQsInMiOjEsInIiOjEsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=";
-const hjSessionUser ="eyJpZCI6ImRkM2QwMmVmLTdhYmUtNTlhMi1hM2VmLTg3ZjU1ZGJkNDA4YiIsImNyZWF0ZWQiOjE3NjUyNzMzNzM3MDIsImV4aXN0aW5nIjp0cnVlfQ==";
+const hjSessionUser ="eyJpZCI6ImRkM2eyJpZCI6Ijc0Yzc2Yzk3LWQzOGQtNWM5Yy04NzNlLWFiZTM5ZTMyMTNkNyIsImNyZWF0ZWQiOjE3NjUzNTgxOTA2OTAsImV4aXN0aW5nIjpmYWxzZX0=";
 const ASP ="ADIHCIHAMODODCONJNJALOBJ";
 const COOKIES = `_hjSessionUser_3808777=${hjSessionUser}; ASPSESSIONIDSWARTASS=${ASP}; _hjSession_3808777=${hjSession}`;
 
 // URL para exportar HTML consolidado
 const URL = "https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirHtml.asp?iProc=1&iPub=1";
 
+const RESPOSTA_REDIRECT = `{"jsonValidateReturn":["false","redirect","https://www.integra.adv.br/moderno/modulo/0"]}`;
+const DELAY_RETRY_MS = 5000;
+const MAX_TENTATIVAS = 3;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 
 const DATA_INICIO = "01/01/2008";
-//const DATA_FIM = "31/01/2008";
-const DATA_FIM = "31/12/2027";
+const DATA_FIM = "31/12/2010";
+//const DATA_FIM = "31/12/2027";
 
 const OUTPUTS_DIR = path.join(__dirname, "outputs");
 
@@ -200,25 +206,37 @@ function montarPayload(inicio, fim, pagina = "") {
 
 async function fazerRequisicao(dataInicio, dataFim, pagina = "") {
   const body = montarPayload(dataInicio, dataFim, pagina);
+  let tentativa = 1;
 
-  const res = await fetch(URL, {
-    method: "POST",
-    headers: {
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Cache-Control": "max-age=0",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "Cookie": COOKIES,
-      "X-Requested-With": "XMLHttpRequest",
-      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-      "Origin": "https://integra.adv.br",
-      "Referer": "https://integra.adv.br/moderno/modulo/95/default.asp",
-    },
-    body
-  });
+  while (true) {
+    const res = await fetch(URL, {
+      method: "POST",
+      headers: {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "max-age=0",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Cookie": COOKIES,
+        "X-Requested-With": "XMLHttpRequest",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+        "Origin": "https://integra.adv.br",
+        "Referer": "https://integra.adv.br/moderno/modulo/95/default.asp",
+      },
+      body
+    });
 
-  const text = await res.text();
-  return { status: res.status, html: text };
+    const text = await res.text();
+
+    // Caso retorne JSON de redirect, tenta novamente após delay
+    if (text.trim() === RESPOSTA_REDIRECT && tentativa < MAX_TENTATIVAS) {
+      console.log(`  🔁 Resposta de redirect recebida, tentativa ${tentativa}/${MAX_TENTATIVAS - 1}. Aguardando 5s e tentando novamente...`);
+      tentativa++;
+      await delay(DELAY_RETRY_MS);
+      continue;
+    }
+
+    return { status: res.status, html: text };
+  }
 }
 
 
