@@ -4,10 +4,10 @@ const fetch = require("node-fetch");
 const qs = require("querystring");
 const { JSDOM } = require("jsdom");
 
-const hjSession ="eyJpZCI6ImQ3MDExZWZjLWU3MmMtNGRkNi05NzQ3LTVmNmU4NGZjOWM1YiIsImMiOjE3NjUzNTQxMzYwMjQsInMiOjEsInIiOjEsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=";
-const hjSessionUser ="eyJpZCI6ImRkM2eyJpZCI6Ijc0Yzc2Yzk3LWQzOGQtNWM5Yy04NzNlLWFiZTM5ZTMyMTNkNyIsImNyZWF0ZWQiOjE3NjUzNTgxOTA2OTAsImV4aXN0aW5nIjpmYWxzZX0=";
-const ASP ="ADIHCIHAMODODCONJNJALOBJ";
-const COOKIES = `_hjSessionUser_3808777=${hjSessionUser}; ASPSESSIONIDSWARTASS=${ASP}; _hjSession_3808777=${hjSession}`;
+const hjSession ="eyJpZCI6ImUzZjBlNDE3LWNlMjAtNDJjMS1iODdmLTY1NTczZjY1NzM3NyIsImMiOjE3NjUzNjY3MzY3NTcsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MX0=";
+const hjSessionUser ="eyJpZCI6ImFmNDJkMGUxLTRhYmEtNWIxMy05MGUwLWFkMjhlZjE2ZjcxZiIsImNyZWF0ZWQiOjE3NjI4ODMxMTA1MzMsImV4aXN0aW5nIjp0cnVlfQ==";
+const ASP ="BIECFLJADAIFIEIFLBPBLJGA";
+const COOKIES = `_hjSessionUser_3808777=${hjSessionUser}; ASPSESSIONIDSWAQQCTS=${ASP}; _hjSession_3808777=${hjSession}`;
 
 // URL para exportar HTML consolidado
 const URL = "https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirHtml.asp?iProc=1&iPub=1";
@@ -20,8 +20,8 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
 const DATA_INICIO = "01/01/2008";
-const DATA_FIM = "31/12/2010";
-//const DATA_FIM = "31/12/2027";
+//const DATA_FIM = "31/12/2010";
+const DATA_FIM = "31/12/2027";
 
 const OUTPUTS_DIR = path.join(__dirname, "outputs");
 

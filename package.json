@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "excel": "node --max-old-space-size=8192 geraExcel.js",
+    "excel": "node --max-old-space-size=16384 geraExcel.js",
     "get": "node get_integra_node.js"
   },
   "dependencies": {

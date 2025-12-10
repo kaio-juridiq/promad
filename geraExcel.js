@@ -27,15 +27,46 @@ function normalizarTexto(texto = "") {
   return texto.replace(/\s+/g, " ").trim();
 }
 
+function limitarTexto(texto = "", max = 500) {
+  // Evita strings enormes que podem quebrar o Excel
+  return texto.length > max ? texto.slice(0, max) : texto;
+}
+
+function extrairDiaSemana(texto) {
+  // Procura o dia da semana em qualquer lugar do texto
+  const normalizado = normalizarTexto(texto);
+  const matchDiaSemana = normalizado.match(/(segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)(?:-feira)?/i);
+  if (!matchDiaSemana) return "";
+  
+  // Normaliza os nomes dos dias
+  const dia = matchDiaSemana[1].toLowerCase();
+  const diasNormalizados = {
+    "segunda": "Segunda-feira",
+    "terça": "Terça-feira",
+    "terca": "Terça-feira",
+    "quarta": "Quarta-feira",
+    "quinta": "Quinta-feira",
+    "sexta": "Sexta-feira",
+    "sábado": "Sábado",
+    "sabado": "Sábado",
+    "domingo": "Domingo"
+  };
+  
+  return diasNormalizados[dia] || matchDiaSemana[1];
+}
+
 function extrairDataHoraDiaSemana(texto) {
   const normalizado = normalizarTexto(texto);
-  const matchDataHora = normalizado.match(/(\d{2}\/\d{2}\/\d{4})\s*-\s*([^ ]+)/);
-  const dataAg = matchDataHora ? matchDataHora[1] : "";
-  const horaBruta = matchDataHora ? matchDataHora[2] : "";
-  const horaAg = (horaBruta.split(/[\/\s-]/).find(p => /\d{2}:\d{2}/.test(p)) || "").trim();
+  // Captura data no formato DD/MM/AAAA, mesmo sem hora
+  const matchData = normalizado.match(/(\d{2}\/\d{2}\/\d{4})/);
+  const dataAg = matchData ? matchData[1] : "";
 
-  const matchDiaSemana = normalizado.match(/^(segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)/i);
-  const diaSemana = matchDiaSemana ? matchDiaSemana[1] : "";
+  // Captura a primeira hora que aparecer (HH:MM)
+  const matchHora = normalizado.match(/(\d{2}:\d{2})/);
+  const horaAg = matchHora ? matchHora[1] : "";
+
+  // Procura o dia da semana em qualquer lugar do texto
+  const diaSemana = extrairDiaSemana(texto);
 
   return { dataAg, horaAg, diaSemana };
 }
@@ -222,7 +253,17 @@ function processarHTMLTabelaSimples(html) {
     if (horaAg.includes(" - ")) {
       horaAg = horaAg.split(" - ")[0].trim();
     }
-    const diaSemana = cols[2]?.textContent.trim() || "";
+    let diaSemana = cols[2]?.textContent.trim() || "";
+    
+    // Se não encontrou o dia da semana na coluna 2, tenta extrair da data ou do texto completo da linha
+    if (!diaSemana) {
+      const textoCompleto = tr.textContent || "";
+      diaSemana = extrairDiaSemana(textoCompleto);
+      // Se ainda não encontrou, tenta extrair da coluna de data
+      if (!diaSemana && dataAg) {
+        diaSemana = extrairDiaSemana(dataAg);
+      }
+    }
     const remetente = cols[3]?.textContent.trim() || "";
     const destinatario = cols[4]?.textContent.trim() || "";
     const tipo = cols[5]?.textContent.trim() || "";
@@ -280,7 +321,26 @@ function* processarHTMLAgendaImprimir(html) {
       continue;
     }
 
-    const { dataAg, horaAg, diaSemana } = extrairDataHoraDiaSemana(textoPrimeiro);
+    // Tenta extrair dia da semana do primeiro td
+    let { dataAg, horaAg, diaSemana } = extrairDataHoraDiaSemana(textoPrimeiro);
+    
+    // Se não encontrou o dia da semana, procura em linhas anteriores
+    if (!diaSemana) {
+      let linhaAnterior = i - 1;
+      while (linhaAnterior >= 0 && linhaAnterior >= i - 3) {
+        const trAnterior = document.querySelectorAll("tr")[linhaAnterior];
+        if (trAnterior) {
+          const textoAnterior = normalizarTexto(trAnterior.textContent || "");
+          const diaEncontrado = extrairDiaSemana(textoAnterior);
+          if (diaEncontrado) {
+            diaSemana = diaEncontrado;
+            break;
+          }
+        }
+        linhaAnterior--;
+      }
+    }
+    
     const item = {
       dataAg,
       horaAg,
@@ -566,9 +626,32 @@ async function* processarHTMLStream(html) {
     const [dataAg, horaAg] = dataHora.split(" ");
 
     let diaSemana = "";
+    // Tenta pegar do elemento anterior com classe TableTrover
     const previous = tr.previousElementSibling;
     if (previous && previous.classList.contains("TableTrover")) {
       diaSemana = previous.textContent.trim();
+    }
+    
+    // Se não encontrou, procura no texto completo da linha atual
+    if (!diaSemana) {
+      const textoCompletoLinha = tr.textContent || "";
+      diaSemana = extrairDiaSemana(textoCompletoLinha);
+    }
+    
+    // Se ainda não encontrou, tenta procurar em elementos anteriores próximos
+    if (!diaSemana) {
+      let elementoAnterior = tr.previousElementSibling;
+      let tentativas = 0;
+      while (elementoAnterior && tentativas < 5) {
+        const textoAnterior = elementoAnterior.textContent || "";
+        const diaEncontrado = extrairDiaSemana(textoAnterior);
+        if (diaEncontrado) {
+          diaSemana = diaEncontrado;
+          break;
+        }
+        elementoAnterior = elementoAnterior.previousElementSibling;
+        tentativas++;
+      }
     }
 
     // Prioriza: coluna > elementos filhos > dados do modal > data-* > vazio
@@ -650,7 +733,7 @@ async function gerarExcel() {
         item.idProcesso || "",
         item.localTramite || "",
         item.pasta || "",
-        item.publicacaoJuridica || ""
+        limitarTexto(item.publicacaoJuridica || "")
       ]);
     }
     
