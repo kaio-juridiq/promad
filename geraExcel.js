@@ -23,6 +23,23 @@ const DIR_PROCESSAR = pastaArg
   ? path.join(OUTPUTS_DIR, pastaArg)
   : OUTPUTS_DIR;
 
+function normalizarTexto(texto = "") {
+  return texto.replace(/\s+/g, " ").trim();
+}
+
+function extrairDataHoraDiaSemana(texto) {
+  const normalizado = normalizarTexto(texto);
+  const matchDataHora = normalizado.match(/(\d{2}\/\d{2}\/\d{4})\s*-\s*([^ ]+)/);
+  const dataAg = matchDataHora ? matchDataHora[1] : "";
+  const horaBruta = matchDataHora ? matchDataHora[2] : "";
+  const horaAg = (horaBruta.split(/[\/\s-]/).find(p => /\d{2}:\d{2}/.test(p)) || "").trim();
+
+  const matchDiaSemana = normalizado.match(/^(segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)/i);
+  const diaSemana = matchDiaSemana ? matchDiaSemana[1] : "";
+
+  return { dataAg, horaAg, diaSemana };
+}
+
 function obterArquivosHTML() {
   const dirProcessar = DIR_PROCESSAR;
   
@@ -245,6 +262,106 @@ function processarHTMLTabelaSimples(html) {
   return resultados;
 }
 
+function* processarHTMLAgendaImprimir(html) {
+  // Processa HTML no formato "imprimir" (layout vertical com classListagem)
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+  const rows = [...document.querySelectorAll("tr.classListagem")];
+
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    const tds = row.querySelectorAll("td");
+    const textoPrimeiro = normalizarTexto(tds[0]?.textContent || "");
+
+    // Início do bloco quando há data
+    if (!/\d{2}\/\d{2}\/\d{4}/.test(textoPrimeiro)) {
+      i++;
+      continue;
+    }
+
+    const { dataAg, horaAg, diaSemana } = extrairDataHoraDiaSemana(textoPrimeiro);
+    const item = {
+      dataAg,
+      horaAg,
+      diaSemana,
+      remetente: "",
+      destinatario: "",
+      tipo: "",
+      resumo: "",
+      agendamento: "",
+      cliente: "",
+      parteAdversa: "",
+      processo: "",
+      comarca: "",
+      idProcesso: "",
+      localTramite: "",
+      pasta: "",
+      publicacaoJuridica: ""
+    };
+
+    let j = i + 1;
+    while (j < rows.length) {
+      const r = rows[j];
+      const rTds = r.querySelectorAll("td");
+      const textoLinha = normalizarTexto(rTds[rTds.length - 1]?.textContent || "");
+      const textoPrimeiroTd = normalizarTexto(rTds[0]?.textContent || "");
+
+      // Novo bloco detectado (data em outra linha com rowspan)
+      const novoInicio = /\d{2}\/\d{2}\/\d{4}/.test(textoPrimeiroTd) && rTds[0]?.getAttribute("rowspan");
+      if (novoInicio) break;
+
+      if (/remetente:/i.test(textoLinha)) {
+        item.remetente = textoLinha.replace(/.*remetente[:\s]*/i, "");
+      }
+      if (/destinat[áa]rio/i.test(textoLinha)) {
+        item.destinatario = textoLinha.replace(/.*destinat[áa]rio(?:\(s\))?[:\s]*/i, "");
+      }
+      if (/tipo:/i.test(textoLinha)) {
+        item.tipo = textoLinha.replace(/.*tipo[:\s]*/i, "");
+      }
+      if (/resumo:/i.test(textoLinha)) {
+        item.resumo = textoLinha.replace(/.*resumo[:\s]*/i, "");
+      }
+      if (/agendamento:/i.test(textoLinha)) {
+        item.agendamento = textoLinha.replace(/.*agendamento[:\s]*/i, "");
+      }
+      if (/cliente:/i.test(textoLinha)) {
+        item.cliente = textoLinha.replace(/.*cliente[:\s]*/i, "");
+      }
+      if (/parte\s+adversa|adverso/i.test(textoLinha)) {
+        item.parteAdversa = textoLinha.replace(/.*(?:parte\s+adversa|adverso)[:\s]*/i, "");
+      }
+      if (/processo:/i.test(textoLinha)) {
+        const mProc = textoLinha.match(/processo:\s*([^<\n\r]+?)(?=\s{2,}|pasta:|id|comarca:|local|$)/i);
+        if (mProc) item.processo = mProc[1].trim();
+
+        const mPasta = textoLinha.match(/pasta:\s*([^<\n\r]+?)(?=\s{2,}|id|comarca:|local|$)/i);
+        if (mPasta) item.pasta = mPasta[1].trim();
+
+        const mId = textoLinha.match(/id\s*(?:do)?\s*processo:\s*([^\s<]+)/i);
+        if (mId) item.idProcesso = mId[1].trim();
+      }
+      if (/comarca:/i.test(textoLinha)) {
+        const mCom = textoLinha.match(/comarca:\s*([^<\n\r]+?)(?=\s{2,}|local|$)/i);
+        if (mCom) item.comarca = mCom[1].trim();
+
+        const mLoc = textoLinha.match(/local\s+de\s+tr[âa]mite:\s*([^<\n\r]+)/i);
+        if (mLoc) item.localTramite = mLoc[1].trim();
+      }
+
+      j++;
+    }
+
+    if (!item.agendamento && item.resumo) {
+      item.agendamento = item.resumo;
+    }
+
+    yield item;
+    i = j;
+  }
+}
+
 async function* processarHTMLStream(html) {
   const dom = new JSDOM(html);
   const document = dom.window.document;
@@ -257,6 +374,14 @@ async function* processarHTMLStream(html) {
     // Processa formato de tabela simples
     const resultados = processarHTMLTabelaSimples(html);
     for (const item of resultados) {
+      yield item;
+    }
+    return;
+  }
+
+  // Formato "imprimir" (linhas verticais)
+  if (document.querySelector("tr.classListagem")) {
+    for (const item of processarHTMLAgendaImprimir(html)) {
       yield item;
     }
     return;

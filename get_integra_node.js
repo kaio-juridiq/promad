@@ -4,13 +4,14 @@ const fetch = require("node-fetch");
 const qs = require("querystring");
 const { JSDOM } = require("jsdom");
 
-const COOKIES = `_hjSession_3808777=eyJpZCI6IjE2NDYxMzAwLWI2ZGYtNDQxOS05MmUyLWEyNzk1NzlhMTI2YyIsImMiOjE3NjUyNzMzNzM3MDMsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjoxLCJzcCI6MH0=; _hjSessionUser_3808777=eyJpZCI6ImRkM2QwMmVmLTdhYmUtNTlhMi1hM2VmLTg3ZjU1ZGJkNDA4YiIsImNyZWF0ZWQiOjE3NjUyNzMzNzM3MDIsImV4aXN0aW5nIjp0cnVlfQ==; ASPSESSIONIDQUBRQBST=DDOJICPDBEDIEKAMIMGAELNO`;
+const hjSession ="eyJpZCI6ImQ3MDExZWZjLWU3MmMtNGRkNi05NzQ3LTVmNmU4NGZjOWM1YiIsImMiOjE3NjUzNTQxMzYwMjQsInMiOjEsInIiOjEsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=";
+const hjSessionUser ="eyJpZCI6ImRkM2QwMmVmLTdhYmUtNTlhMi1hM2VmLTg3ZjU1ZGJkNDA4YiIsImNyZWF0ZWQiOjE3NjUyNzMzNzM3MDIsImV4aXN0aW5nIjp0cnVlfQ==";
+const ASP ="ADIHCIHAMODODCONJNJALOBJ";
+const COOKIES = `_hjSessionUser_3808777=${hjSessionUser}; ASPSESSIONIDSWARTASS=${ASP}; _hjSession_3808777=${hjSession}`;
 
-//"https://www.integra.adv.br/moderno/modulo/95/controleRotinaListar.asp";
-const URL ='https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirHtml.asp?iProc=1&iPub=1';
-//https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirHtml.asp?iProc=1&iPub=1
-//const URL = "https://integra.adv.br/moderno/modulo/95/controleRotinaListar.asp?_=0.3625709375821339";
-//const URL = "https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirExcel.asp?iProc=0&iPub=0&codrelatorio=0";
+// URL para exportar HTML consolidado
+const URL = "https://integra.adv.br/moderno/modulo/95/controleRotinaImprimirHtml.asp?iProc=1&iPub=1";
+
 
 const DATA_INICIO = "01/01/2008";
 //const DATA_FIM = "31/01/2008";
@@ -127,6 +128,9 @@ function montarPayload(inicio, fim, pagina = "") {
     hdOrdenacao: "DATA_INICIAL",
     hdOrdenacaoTipo: "ASC",
     hdTipoData: "aDataMenu1",
+    hdUnificar: "1",
+    hdTelaFechar: "6",
+    hdCheckMarcado: "",
 
     hdPesqCliente: "/Cliente",
     hdPesqResp: "/Responsável",
@@ -137,8 +141,11 @@ function montarPayload(inicio, fim, pagina = "") {
     txtFiltroControleAgenda: `${inicio} - ${fim}`,
     txtFiltroInicioControleAgenda: inicio,
     txtFiltroFimControleAgenda: fim,
+    txtFiltroInicioControleAgendaIgual: inicio,
 
     limiteFiltroDatas: "3",
+    txtContador: "200",
+    txtTotalRegistroT: "",
 
     // 🔥 OBRIGATÓRIO: todos os slcRemetente
     slcRemetente: [
@@ -197,10 +204,15 @@ async function fazerRequisicao(dataInicio, dataFim, pagina = "") {
   const res = await fetch(URL, {
     method: "POST",
     headers: {
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "max-age=0",
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       "Cookie": COOKIES,
       "X-Requested-With": "XMLHttpRequest",
-      "User-Agent": "Mozilla/5.0",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+      "Origin": "https://integra.adv.br",
+      "Referer": "https://integra.adv.br/moderno/modulo/95/default.asp",
     },
     body
   });
